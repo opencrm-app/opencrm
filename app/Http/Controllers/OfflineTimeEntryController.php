@@ -25,7 +25,7 @@ class OfflineTimeEntryController extends Controller
         // Teams where user can manage members (Owner or Admin)
         $manageableTeamIds = \App\Models\Team::where('owner_id', $user->id)
             ->orWhereHas('members', function($q) use ($user) {
-                $q->where('user_id', $user->id)->where('role', 'admin');
+                $q->where('team_user.user_id', $user->id)->where('team_user.role', 'admin');
             })->pluck('id')->toArray();
 
         // Base restriction
