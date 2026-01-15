@@ -30,6 +30,8 @@ interface ChartData {
 const props = defineProps<{
     stats: {
         today_minutes: number;
+        personal_today_minutes?: number;
+        personal_offline_start?: string | null; // Added
         today_formatted: string;
         month_minutes: number;
         month_formatted: string;
@@ -137,7 +139,15 @@ const breadcrumbs = [
             <div class="grid gap-6 md:grid-cols-2">
                 <!-- Daily Goal Widget (Includes Stats Overview via Partition) -->
                 <DailyGoalWidget
-                    :offline-minutes="Number(stats.today_minutes || 0)"
+                    :offline-minutes="
+                        Number(
+                            stats.personal_today_minutes ||
+                                stats.today_minutes ||
+                                0,
+                        )
+                    "
+                    :offline-start-prop="stats.personal_offline_start"
+                    :stats-today-formatted="stats.today_formatted"
                     :month-formatted="stats.month_formatted"
                     :admin-stats="adminStats"
                     :is-admin="isAdmin"
@@ -167,10 +177,10 @@ const breadcrumbs = [
                                 class="group flex flex-1 flex-col items-center gap-2"
                             >
                                 <div
-                                    class="relative flex w-full flex-1 items-end justify-center"
+                                    class="relative flex h-[160px] w-full items-end justify-center"
                                 >
                                     <div
-                                        class="w-full max-w-[40px] rounded-t-md bg-primary/90 transition-all group-hover:bg-primary"
+                                        class="min-h-[4px] w-full max-w-[40px] rounded-t-md bg-primary/90 transition-all group-hover:bg-primary"
                                         :style="{
                                             height: `${(day.hours / maxHours) * 100}%`,
                                         }"

@@ -17,46 +17,71 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
         
-        // Base query for stats
-        $query = OfflineTimeEntry::query();
-        
+        // 1. Personal Query (For Progress Bar & Pace)
+        // ALWAYS filtered by the current user to track their own 8h goal
+        $personalQuery = OfflineTimeEntry::query()->where('user_id', $user->id);
+
+        // 2. Stats Query (For Cards - Logged Today, This Month)
+        // Admin = Global (All Users), User = Personal
+        $statsQuery = OfflineTimeEntry::query();
         if (!$user->isAdmin()) {
-            $query->where('user_id', $user->id);
+            $statsQuery->where('user_id', $user->id);
         }
 
-        // 1. Today's Stats
-        $todayMinutes = (clone $query)
+        // --- CALCULATION ---
+
+        // Personal Today (For Progress Bar)
+        $personalTodayQuery = (clone $personalQuery)->whereDate('date', Carbon::today());
+        $personalTodayMinutes = $personalTodayQuery->sum('duration_minutes');
+        $personalOfflineStart = $personalTodayQuery->orderBy('start_time', 'asc')->value('start_time');
+
+        // Stats Today (For Card)
+        $statsTodayMinutes = (clone $statsQuery)
             ->whereDate('date', Carbon::today())
             ->sum('duration_minutes');
             
-        // 2. This Month's Stats (Offline)
-        $monthOfflineMinutes = (clone $query)
+        // Personal Month Offline (For Pace)
+        $personalMonthOffline = (clone $personalQuery)
             ->whereMonth('date', Carbon::now()->month)
             ->whereYear('date', Carbon::now()->year)
             ->sum('duration_minutes');
 
-        // 3. Recent Entries (Last 5)
-        $recentEntries = (clone $query)
+        // Stats Month (For Card)
+        $statsMonthMinutes = (clone $statsQuery)
+            ->whereMonth('date', Carbon::now()->month)
+            ->whereYear('date', Carbon::now()->year)
+            ->sum('duration_minutes');
+
+        // 3. Recent Entries (User Specific usually, or Admin sees all?)
+        // Usually recent entries are personal log, but let's keep previous behavior:
+        // Previous behavior: If Admin, query was global. Let's keep that for the "Recent Entries" list.
+        $recentEntries = (clone $statsQuery)
             ->with(['user:id,name'])
             ->orderBy('date', 'desc')
             ->orderBy('start_time', 'desc')
             ->limit(5)
             ->get();
 
-        // 4. Activity Chart Data (Last 7 Days)
+        // 4. Activity Chart Data (Stats Query - Contextual)
+        $ssmWeekData = $this->getSSMWeekData($user);
         $chartData = [];
+        
         for ($i = 6; $i >= 0; $i--) {
             $date = Carbon::today()->subDays($i);
+            $dateKey = $date->format('Y-m-d'); // Key format from SSM parsing
             
-            $minutes = (clone $query)
+            $offlineMinutes = (clone $statsQuery)
                 ->whereDate('date', $date)
                 ->sum('duration_minutes');
+                
+            $ssmMinutes = $ssmWeekData[$dateKey] ?? 0;
+            $totalMinutes = $offlineMinutes + $ssmMinutes;
                 
             $chartData[] = [
                 'date' => $date->format('M d'),
                 'full_date' => $date->format('Y-m-d'),
-                'minutes' => (int) $minutes,
-                'hours' => round($minutes / 60, 1),
+                'minutes' => (int) $totalMinutes,
+                'hours' => round($totalMinutes / 60, 1),
             ];
         }
 
@@ -68,18 +93,23 @@ class DashboardController extends Controller
                 'active_users_today' => OfflineTimeEntry::whereDate('date', Carbon::today())
                     ->distinct('user_id')
                     ->count(),
+                // Note: We are now passing the consolidated stats via the 'stats' prop too,
+                // but keeping these specific counters here.
             ];
         }
 
-        // 6. Monthly Pace Calculation
-        $monthlyPace = $this->calculateMonthlyPace($user, (int) $monthOfflineMinutes);
+        // 6. Monthly Pace Calculation (ALWAYS Personal)
+        // The pacing widget is for the individual user's target.
+        $monthlyPace = $this->calculateMonthlyPace($user, (int) $personalMonthOffline);
 
         return Inertia::render('Dashboard', [
             'stats' => [
-                'today_minutes' => (int) $todayMinutes,
-                'today_formatted' => $this->formatDuration((int) $todayMinutes),
-                'month_minutes' => (int) $monthOfflineMinutes,
-                'month_formatted' => $this->formatDuration((int) $monthOfflineMinutes),
+                'personal_today_minutes' => (int) $personalTodayMinutes, // For Progress Bar
+                'personal_offline_start' => $personalOfflineStart,       // For Progress Bar Start Time fallback
+                'today_minutes' => (int) $statsTodayMinutes,             // For Card
+                'today_formatted' => $this->formatDuration((int) $statsTodayMinutes),
+                'month_minutes' => (int) $statsMonthMinutes,             // For Card
+                'month_formatted' => $this->formatDuration((int) $statsMonthMinutes),
             ],
             'recentEntries' => $recentEntries,
             'chartData' => $chartData,
@@ -255,6 +285,102 @@ class DashboardController extends Controller
         Log::info('SSM Monthly Report', ['from' => $from, 'to' => $to, 'totalMinutes' => $totalMinutes]);
         
         return $totalMinutes;
+    }
+
+    /**
+     * Get SSM week data (daily breakdown) with 60-minute cache.
+     * Returns ['Y-m-d' => minutes]
+     */
+    private function getSSMWeekData($user): array
+    {
+        if (empty($user->ssm_api_token)) {
+            return [];
+        }
+
+        // Cache for 1 hour (less critical than monthly pace)
+        $cacheKey = 'ssm_week_chart_' . $user->id . '_' . Carbon::today()->format('Y-m-d');
+        
+        return Cache::remember($cacheKey, 3600, function () use ($user) {
+            try {
+                return $this->fetchSSMWeekReport($user->ssm_api_token);
+            } catch (\Exception $e) {
+                Log::error('SSM Week Chart fetch failed', ['error' => $e->getMessage()]);
+                return [];
+            }
+        });
+    }
+
+    /**
+     * Fetch week report from SSM API and parse daily timeline.
+     */
+    private function fetchSSMWeekReport(string $apiToken): array
+    {
+        $to = Carbon::today()->format('Y-m-d');
+        $from = Carbon::today()->subDays(6)->format('Y-m-d');
+
+        // First get employmentId
+        $commonResponse = Http::withoutVerifying()->withHeaders([
+            'X-SSM-Token' => $apiToken,
+            'Accept' => 'application/json',
+        ])->get('https://screenshotmonitor.com/api/v2/GetCommonData');
+
+        if ($commonResponse->failed()) {
+            throw new \Exception('GetCommonData failed');
+        }
+
+        $employmentId = $commonResponse->json('employmentId');
+        
+        // Fallback common logic can be extracted but keeping inline for safety
+        if (!$employmentId) {
+             // Basic fallback matching getDailyStats logic
+             $commonData = $commonResponse->json();
+             $employments = $commonData['employments'] ?? [];
+             if (!empty($employments)) {
+                 $employmentId = $employments[0]['id'] ?? null;
+             }
+        }
+
+        if (!$employmentId) {
+            throw new \Exception('No employmentId found');
+        }
+
+        // Fetch report
+        $reportResponse = Http::withoutVerifying()->withHeaders([
+            'X-SSM-Token' => $apiToken,
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ])->post('https://screenshotmonitor.com/api/v2/GetReport', [
+            'employmentId' => $employmentId,
+            'from' => $from,
+            'to' => $to,
+        ]);
+
+        if ($reportResponse->failed()) {
+            throw new \Exception('GetReport failed');
+        }
+
+        $data = $reportResponse->json();
+        $dailyData = [];
+
+        // Parse from charts.timeline: [{"Date": "1/15/2026", "Duration": 326}]
+        if (isset($data['charts']['timeline']) && is_array($data['charts']['timeline'])) {
+            foreach ($data['charts']['timeline'] as $record) {
+                $rawDate = $record['Date'] ?? null;
+                $duration = $record['Duration'] ?? 0;
+                
+                if ($rawDate) {
+                    try {
+                        // Carbon::parse handles various formats intelligently
+                        $dateKey = Carbon::parse($rawDate)->format('Y-m-d');
+                        $dailyData[$dateKey] = (int) $duration;
+                    } catch (\Exception $e) {
+                        Log::warning('SSM Chart: Date parse failed', ['date' => $rawDate]);
+                    }
+                }
+            }
+        }
+        
+        return $dailyData;
     }
 
     private function formatDuration(int $minutes): string

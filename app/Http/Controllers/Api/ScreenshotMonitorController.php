@@ -34,6 +34,8 @@ class ScreenshotMonitorController extends Controller
 
         if ($forceRefresh) {
             Cache::forget($cacheKey);
+            // Also revert week chart cache so the main dashboard updates on reload
+            Cache::forget('ssm_week_chart_' . $user->id . '_' . now()->format('Y-m-d'));
         }
 
         try {
@@ -44,6 +46,7 @@ class ScreenshotMonitorController extends Controller
             return response()->json([
                 'configured' => true,
                 'online_minutes' => $data['online_minutes'] ?? 0,
+                'start_time' => $data['start_time'] ?? null,
                 'cached' => !$forceRefresh && Cache::has($cacheKey),
                 'error' => null,
             ]);
@@ -170,6 +173,7 @@ class ScreenshotMonitorController extends Controller
         // Calculate total time from GetReport response
         // API returns PascalCase keys like "Duration" not "duration"
         $totalMinutes = 0;
+        $earliestStart = null;
         
         // PREFERRED: Get total from 'charts' -> 'employments' (aggregated summary)
         if (isset($responseData['charts']['employments']) && is_array($responseData['charts']['employments'])) {
@@ -191,11 +195,45 @@ class ScreenshotMonitorController extends Controller
             Log::info('SSM: Parsed from root Duration', ['totalMinutes' => $totalMinutes]);
         }
 
-        Log::info('SSM: Final calculated time', ['totalMinutes' => $totalMinutes]);
+        // --- Extract Start Time ---
+        // Look in 'body' for activity details to find the earliest start time
+        // --- Extract Start Time ---
+        // Look in 'body' for activity details to find the earliest start time
+        if (isset($responseData['body']) && is_array($responseData['body'])) {
+            foreach ($responseData['body'] as $entry) {
+                // API returns "From": "09:46AM" and "Date": "01/15/26"
+                $from = $entry['From'] ?? $entry['from'] ?? null;
+                $dateStr = $entry['Date'] ?? $entry['date'] ?? null;
+                
+                if ($from && $dateStr) {
+                    try {
+                        // Parse "01/15/26 09:46AM"
+                        // Assuming m/d/y format from log
+                        $dt = \Carbon\Carbon::createFromFormat('m/d/y h:iA', $dateStr . ' ' . $from);
+                        // Use Local ISO format (no timezone) so browser treats it as local wall-clock time
+                        $iso = $dt->format('Y-m-d\TH:i:s');
+                        
+                        if (is_null($earliestStart) || $iso < $earliestStart) {
+                            $earliestStart = $iso;
+                        }
+                    } catch (\Exception $e) {
+                         Log::warning('SSM: Could not parse date/time', ['date' => $dateStr, 'from' => $from, 'error' => $e->getMessage()]);
+                    }
+                }
+            }
+        }
+        // If no body, checking if we can get it elsewhere? usually body has the details. 
+        // If not found, earliestStart remains null.
+
+        Log::info('SSM: Final calculated time', [
+            'totalMinutes' => $totalMinutes,
+            'earliestStart' => $earliestStart
+        ]);
 
         return [
             'online_minutes' => (int) $totalMinutes,
             'employment_id' => $employmentId,
+            'start_time' => $earliestStart,
         ];
     }
 }
