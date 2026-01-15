@@ -77,6 +77,39 @@ const user = page.props.auth.user;
                         <InputError class="mt-2" :message="errors.email" />
                     </div>
 
+                    <!-- ScreenshotMonitor Configuration -->
+                    <div class="mt-6 border-t pt-6">
+                        <h3 class="mb-4 text-sm font-medium">
+                            ScreenshotMonitor Integration
+                        </h3>
+                        <p class="mb-4 text-xs text-muted-foreground">
+                            Connect your ScreenshotMonitor account to track
+                            online work time alongside your offline entries.
+                            Your Employment ID will be detected automatically.
+                        </p>
+
+                        <div class="grid gap-2">
+                            <Label for="ssm_api_token">API Token</Label>
+                            <Input
+                                id="ssm_api_token"
+                                type="password"
+                                class="mt-1 block w-full"
+                                name="ssm_api_token"
+                                :default-value="user.ssm_api_token || ''"
+                                autocomplete="off"
+                                placeholder="Your SSM API Token"
+                            />
+                            <InputError
+                                class="mt-2"
+                                :message="errors.ssm_api_token"
+                            />
+                            <p class="text-xs text-muted-foreground">
+                                Find your API token in ScreenshotMonitor →
+                                Profile → API section.
+                            </p>
+                        </div>
+                    </div>
+
                     <div v-if="mustVerifyEmail && !user.email_verified_at">
                         <p class="-mt-4 text-sm text-muted-foreground">
                             Your email address is unverified.

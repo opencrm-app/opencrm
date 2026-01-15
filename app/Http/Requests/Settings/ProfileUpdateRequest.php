@@ -25,6 +25,8 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            'ssm_api_token' => ['nullable', 'string', 'max:500'],
+            'ssm_user_id' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

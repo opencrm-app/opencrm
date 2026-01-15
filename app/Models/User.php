@@ -22,6 +22,8 @@ class User extends Authenticatable
         'email',
         'role',
         'password',
+        'ssm_api_token',
+        'ssm_user_id',
     ];
 
     /**

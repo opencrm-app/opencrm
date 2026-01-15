@@ -1,16 +1,22 @@
 <script setup lang="ts">
+import DailyGoalWidget from '@/components/DailyGoalWidget.vue';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-    Clock, 
-    Calendar, 
-    TrendingUp, 
-    Plus, 
+import {
+    ArrowRight,
+    Calendar,
+    Clock,
+    Plus,
+    TrendingUp,
     Users as UsersIcon,
-    ArrowRight
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
@@ -59,7 +65,10 @@ const formatTime = (time: string) => {
 };
 
 const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return new Date(date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+    });
 };
 
 const formatDuration = (minutes: number | string) => {
@@ -74,17 +83,19 @@ const formatDuration = (minutes: number | string) => {
 
 // Calculate max hours for chart scaling
 const maxHours = computed(() => {
-    return Math.max(...props.chartData.map(d => d.hours), 1);
+    return Math.max(...props.chartData.map((d) => d.hours), 1);
 });
 
-const getPurposeBadgeVariant = (purpose: string): 'default' | 'secondary' | 'outline' => {
-	const variants: Record<string, 'default' | 'secondary' | 'outline'> = {
-		'Meeting': 'default',
-		'Client Discussion': 'secondary',
-		'Training': 'outline',
-		'Other': 'outline',
-	};
-	return variants[purpose] || 'outline';
+const getPurposeBadgeVariant = (
+    purpose: string,
+): 'default' | 'secondary' | 'outline' => {
+    const variants: Record<string, 'default' | 'secondary' | 'outline'> = {
+        Meeting: 'default',
+        'Client Discussion': 'secondary',
+        Training: 'outline',
+        Other: 'outline',
+    };
+    return variants[purpose] || 'outline';
 };
 
 const breadcrumbs = [
@@ -99,12 +110,18 @@ const breadcrumbs = [
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="container mx-auto p-4 space-y-4">
+        <div class="container mx-auto space-y-4 p-4">
             <!-- Header -->
-            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div
+                class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center"
+            >
                 <div>
-                    <h1 class="text-lg font-semibold tracking-tight">Dashboard</h1>
-                    <p class="text-sm text-muted-foreground">Overview of your offline working activity.</p>
+                    <h1 class="text-lg font-semibold tracking-tight">
+                        Dashboard
+                    </h1>
+                    <p class="text-sm text-muted-foreground">
+                        Overview of your offline working activity.
+                    </p>
                 </div>
                 <Link href="/offline-time/create">
                     <Button>
@@ -114,16 +131,25 @@ const breadcrumbs = [
                 </Link>
             </div>
 
+            <!-- Daily Goal Widget -->
+            <DailyGoalWidget
+                :offline-minutes="Number(stats.today_minutes || 0)"
+            />
+
             <!-- Stats Overview -->
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <!-- Today's Time -->
                 <Card>
                     <CardContent>
-                        <div class="flex items-center gap-2 justify-between">
-                            <CardTitle class="text-sm font-medium">Logged Today</CardTitle>
+                        <div class="flex items-center justify-between gap-2">
+                            <CardTitle class="text-sm font-medium"
+                                >Logged Today</CardTitle
+                            >
                             <Clock class="h-4 w-4 text-muted-foreground" />
                         </div>
-                        <div class="text-xl font-bold">{{ stats.today_formatted }}</div>
+                        <div class="text-xl font-bold">
+                            {{ stats.today_formatted }}
+                        </div>
                         <p class="text-xs text-muted-foreground">
                             Offline work duration today
                         </p>
@@ -133,13 +159,22 @@ const breadcrumbs = [
                 <!-- Month's Time -->
                 <Card>
                     <CardContent>
-                        <div class="flex items-center gap-2 justify-between">
-                            <CardTitle class="text-sm font-medium">This Month</CardTitle>
+                        <div class="flex items-center justify-between gap-2">
+                            <CardTitle class="text-sm font-medium"
+                                >This Month</CardTitle
+                            >
                             <Calendar class="h-4 w-4 text-muted-foreground" />
                         </div>
-                        <div class="text-xl font-bold">{{ stats.month_formatted }}</div>
+                        <div class="text-xl font-bold">
+                            {{ stats.month_formatted }}
+                        </div>
                         <p class="text-xs text-muted-foreground">
-                            Total offline duration for {{ new Date().toLocaleString('default', { month: 'long' }) }}
+                            Total offline duration for
+                            {{
+                                new Date().toLocaleString('default', {
+                                    month: 'long',
+                                })
+                            }}
                         </p>
                     </CardContent>
                 </Card>
@@ -148,11 +183,19 @@ const breadcrumbs = [
                 <template v-if="isAdmin">
                     <Card>
                         <CardContent>
-                            <div class="flex items-center gap-2 justify-between">
-                                <CardTitle class="text-sm font-medium">Active Users (Today)</CardTitle>
-                                <UsersIcon class="h-4 w-4 text-muted-foreground" />
+                            <div
+                                class="flex items-center justify-between gap-2"
+                            >
+                                <CardTitle class="text-sm font-medium"
+                                    >Active Users (Today)</CardTitle
+                                >
+                                <UsersIcon
+                                    class="h-4 w-4 text-muted-foreground"
+                                />
                             </div>
-                            <div class="text-2xl font-bold">{{ adminStats.active_users_today }}</div>
+                            <div class="text-2xl font-bold">
+                                {{ adminStats.active_users_today }}
+                            </div>
                             <p class="text-xs text-muted-foreground">
                                 Users who logged time today
                             </p>
@@ -161,11 +204,19 @@ const breadcrumbs = [
 
                     <Card>
                         <CardContent>
-                            <div class="flex items-center gap-2 justify-between">
-                                <CardTitle class="text-sm font-medium">Total Users</CardTitle>
-                                <UsersIcon class="h-4 w-4 text-muted-foreground" />
+                            <div
+                                class="flex items-center justify-between gap-2"
+                            >
+                                <CardTitle class="text-sm font-medium"
+                                    >Total Users</CardTitle
+                                >
+                                <UsersIcon
+                                    class="h-4 w-4 text-muted-foreground"
+                                />
                             </div>
-                            <div class="text-2xl font-bold">{{ adminStats.total_users }}</div>
+                            <div class="text-2xl font-bold">
+                                {{ adminStats.total_users }}
+                            </div>
                             <p class="text-xs text-muted-foreground">
                                 Registered employees
                             </p>
@@ -182,26 +233,38 @@ const breadcrumbs = [
                             <TrendingUp class="h-5 w-5 text-primary" />
                             Activity (Last 7 Days)
                         </CardTitle>
-                        <CardDescription>Daily offline work hours</CardDescription>
+                        <CardDescription
+                            >Daily offline work hours</CardDescription
+                        >
                     </CardHeader>
                     <CardContent class="pl-2">
-                        <div class="h-[200px] w-full flex items-end justify-between gap-2 pt-4">
-                            <div 
-                                v-for="(day, i) in chartData" 
+                        <div
+                            class="flex h-[200px] w-full items-end justify-between gap-2 pt-4"
+                        >
+                            <div
+                                v-for="(day, i) in chartData"
                                 :key="i"
-                                class="flex-1 flex flex-col items-center gap-2 group"
+                                class="group flex flex-1 flex-col items-center gap-2"
                             >
-                                <div class="relative flex-1 w-full flex items-end justify-center">
-                                    <div 
-                                        class="w-full max-w-[40px] bg-primary/90 rounded-t-md transition-all group-hover:bg-primary"
-                                        :style="{ height: `${(day.hours / maxHours) * 100}%` }"
+                                <div
+                                    class="relative flex w-full flex-1 items-end justify-center"
+                                >
+                                    <div
+                                        class="w-full max-w-[40px] rounded-t-md bg-primary/90 transition-all group-hover:bg-primary"
+                                        :style="{
+                                            height: `${(day.hours / maxHours) * 100}%`,
+                                        }"
                                     ></div>
                                     <!-- Tooltip -->
-                                    <div class="absolute -top-8 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                    <div
+                                        class="absolute -top-8 rounded bg-popover px-2 py-1 text-xs whitespace-nowrap text-popover-foreground opacity-0 shadow transition-opacity group-hover:opacity-100"
+                                    >
                                         {{ day.hours }} hrs
                                     </div>
                                 </div>
-                                <span class="text-xs text-muted-foreground">{{ day.date }}</span>
+                                <span class="text-xs text-muted-foreground">{{
+                                    day.date
+                                }}</span>
                             </div>
                         </div>
                     </CardContent>
@@ -209,41 +272,69 @@ const breadcrumbs = [
 
                 <!-- Recent Activity List -->
                 <Card class="col-span-3">
-                    <CardHeader class="flex flex-row items-center justify-between">
+                    <CardHeader
+                        class="flex flex-row items-center justify-between"
+                    >
                         <CardTitle>Recent Entries</CardTitle>
-                        <Link href="/offline-time" class="text-sm text-primary hover:underline flex items-center">
+                        <Link
+                            href="/offline-time"
+                            class="flex items-center text-sm text-primary hover:underline"
+                        >
                             View all <ArrowRight class="ml-1 h-3 w-3" />
                         </Link>
                     </CardHeader>
                     <CardContent>
                         <div v-if="recentEntries.length > 0" class="space-y-2">
-                            <div v-for="entry in recentEntries" :key="entry.id" class="flex items-start gap-4 p-2 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-                                <div class="p-2 bg-primary/10 rounded-full">
+                            <div
+                                v-for="entry in recentEntries"
+                                :key="entry.id"
+                                class="flex items-start gap-4 rounded-lg border border-transparent p-2 transition-colors hover:border-border hover:bg-muted/50"
+                            >
+                                <div class="rounded-full bg-primary/10 p-2">
                                     <Clock class="h-4 w-4 text-primary" />
                                 </div>
                                 <div class="flex-1 space-y-1">
-                                    <div class="flex items-center justify-between">
-                                        <p class="text-sm font-medium leading-none">
+                                    <div
+                                        class="flex items-center justify-between"
+                                    >
+                                        <p
+                                            class="text-sm leading-none font-medium"
+                                        >
                                             {{ formatDate(entry.date) }}
                                         </p>
-                                        <span class="text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
-                                            {{ formatDuration(entry.duration_minutes) }}
+                                        <span
+                                            class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
+                                        >
+                                            {{
+                                                formatDuration(
+                                                    entry.duration_minutes,
+                                                )
+                                            }}
                                         </span>
                                     </div>
-                                    <p class="text-xs text-muted-foreground line-clamp-1">
+                                    <p
+                                        class="line-clamp-1 text-xs text-muted-foreground"
+                                    >
                                         {{ entry.purpose }}
-                                        <span v-if="entry.user && isAdmin" class="ml-1 text-foreground font-medium">
+                                        <span
+                                            v-if="entry.user && isAdmin"
+                                            class="ml-1 font-medium text-foreground"
+                                        >
                                             by {{ entry.user.name }}
                                         </span>
                                     </p>
                                     <p class="text-xs text-muted-foreground">
-                                        {{ formatTime(entry.start_time) }} - {{ formatTime(entry.end_time) }}
+                                        {{ formatTime(entry.start_time) }} -
+                                        {{ formatTime(entry.end_time) }}
                                     </p>
                                 </div>
                             </div>
                         </div>
-                        <div v-else class="flex flex-col items-center justify-center h-[200px] text-muted-foreground">
-                            <Clock class="h-8 w-8 mb-3 opacity-20" />
+                        <div
+                            v-else
+                            class="flex h-[200px] flex-col items-center justify-center text-muted-foreground"
+                        >
+                            <Clock class="mb-3 h-8 w-8 opacity-20" />
                             <p>No recent activity</p>
                         </div>
                     </CardContent>

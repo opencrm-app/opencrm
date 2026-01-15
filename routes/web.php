@@ -32,6 +32,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('teams/{team}/members', [\App\Http\Controllers\TeamMemberController::class, 'store'])->name('teams.members.store');
     Route::put('teams/{team}/members/{member}', [\App\Http\Controllers\TeamMemberController::class, 'update'])->name('teams.members.update');
     Route::delete('teams/{team}/members/{member}', [\App\Http\Controllers\TeamMemberController::class, 'destroy'])->name('teams.members.destroy');
+
+    // ScreenshotMonitor API
+    Route::get('api/ssm/daily-stats', [\App\Http\Controllers\Api\ScreenshotMonitorController::class, 'getDailyStats'])->name('ssm.daily-stats');
 });
 
 require __DIR__ . '/settings.php';
